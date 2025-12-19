@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  labels:
+    app: backend
+data:
+  PORT: "xxxxxxx"
+  FRONTEND_URL: "xxxxxxxxx"
+  CLOUDINARY_CLOUD_NAME: "xxxxxxxxxx"
+  SENDGRID_EMAIL: "xxxxxxxxxxxxxx"

@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chat-mongo
+  template:
+    metadata:
+      labels:
+        app: chat-mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: chat-mongo-data
+              mountPath: /data/db
+      volumes:
+        - name: chat-mongo-data
+          persistentVolumeClaim:
+            claimName: chat-mongo-pvc
