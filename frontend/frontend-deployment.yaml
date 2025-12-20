@@ -1,46 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: chat-frontend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: frontend
+      app: chat-frontend
   template:
     metadata:
       labels:
-        app: frontend
+        app: chat-frontend
     spec:
       containers:
-        - name: frontend
-          image: donatefront
-          imagePullPolicy: IfNotPresent
+        - name: chat-frontend
+          image: sumitroy161/chat-app:frontend
           ports:
             - containerPort: 80
-
           envFrom:
             - configMapRef:
-                name: frontend-config
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-            limits:
-              cpu: "500m"
-              memory: "256Mi"
-
+                name: chat-frontend-config
           readinessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 5
-            periodSeconds: 10
-
           livenessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 15
-            periodSeconds: 20

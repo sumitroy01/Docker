@@ -493,3 +493,7 @@ export const resetPassword = async (req, res) => {
     return res.status(500).json({ message: "internal server error" });
   }
 };
+
+export const healthCheck = (req, res) => {
+  return res.status(200).json({ status: "ok" });
+};
