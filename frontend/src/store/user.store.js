@@ -2,30 +2,24 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
+import authStore from "./auth.store";
 
 const userstore = create((set, get) => ({
-  user: null,
   userFound: null,
-  isChekingUser: false,
   isUpdatingProfile: false,
   isUpdatingEmail: false,
   isSearchingUser: false,
 
-  emilUnverified: null,
-
-  myUser: async () => {
-    set({ isChekingUser: true });
-    try {
-      const res = await axiosInstance.get("/api/auth/check");
-      set({ user: res.data });
-    } catch (error) {
-      console.log(`error in finding user: ${error.message}`);
-      set({ user: null });
-    } finally {
-      set({ isChekingUser: false });
+  // 🔒 helper: ensure user is authenticated
+  requireAuth() {
+    const { authUser } = authStore.getState();
+    if (!authUser) {
+      throw new Error("Not authenticated");
     }
+    return authUser;
   },
 
+  // 🔍 search other users (public)
   findUser: async (userName) => {
     const value = userName && userName.trim();
     if (!value) return;
@@ -38,15 +32,12 @@ const userstore = create((set, get) => ({
       });
       const user = res.data?.user ?? res.data;
       set({ userFound: user || null });
-      console.log("user found successfully");
-      
     } catch (error) {
       const message =
         error?.response?.data?.message ||
         error.message ||
         "failed to search user";
 
-      console.log("error while searching user", error?.response || error);
       toast.error(message);
       set({ userFound: null });
     } finally {
@@ -54,39 +45,35 @@ const userstore = create((set, get) => ({
     }
   },
 
+  // 🧑 update own profile (auth required)
   updateProfile: async ({ name, userName, avatar, avatarFile }) => {
-    set({ isUpdatingProfile: true });
-
     try {
-      const formData = new FormData();
+      get().requireAuth();
+      set({ isUpdatingProfile: true });
 
+      const formData = new FormData();
       if (name !== undefined) formData.append("name", name);
       if (userName !== undefined) formData.append("userName", userName);
+      if (avatarFile) formData.append("avatar", avatarFile);
+      else if (avatar) formData.append("avatar", avatar);
 
-      if (avatarFile) {
-        formData.append("avatar", avatarFile);
-      } else if (avatar) {
-        formData.append("avatar", avatar);
-      }
-
-      await axiosInstance.post("/api/user/update-profile", formData, {
-        withCredentials: true,
-      });
-
-      toast.success("profile updated sucessfully");
+      await axiosInstance.post("/api/user/update-profile", formData);
+      toast.success("Profile updated successfully");
       return { success: true };
     } catch (error) {
-      console.log(`error in updating profile`, error);
-      toast.error(error?.response?.data?.message);
-      return { success: false, error };
+      toast.error(error?.response?.data?.message || "Failed to update profile");
+      return { success: false };
     } finally {
       set({ isUpdatingProfile: false });
     }
   },
 
+  // 📧 request email change (auth required)
   requestEmailUpdate: async ({ email, password }) => {
-    set({ isUpdatingEmail: true });
     try {
+      get().requireAuth();
+      set({ isUpdatingEmail: true });
+
       await axiosInstance.post("/api/user/email/change/request", {
         email,
         password,
@@ -100,79 +87,73 @@ const userstore = create((set, get) => ({
       } else if (error.response?.status === 401) {
         toast.error("Incorrect password");
       } else {
-        toast.error(error?.response?.data?.message);
+        toast.error(error?.response?.data?.message || "Failed to request email change");
       }
-
-      console.log("error in requestEmailUpdate", error);
-      return { success: false, error };
+      return { success: false };
     } finally {
       set({ isUpdatingEmail: false });
     }
   },
 
+  // 📧 confirm email change (auth required)
   updateEmail: async (otp) => {
-    set({ isUpdatingEmail: true });
     try {
-      await axiosInstance.post("/api/user/email/change/confirm", { otp });
+      get().requireAuth();
+      set({ isUpdatingEmail: true });
 
+      await axiosInstance.post("/api/user/email/change/confirm", { otp });
       toast.success("Email updated successfully");
       return { success: true };
     } catch (error) {
-      if (error.response?.status === 400) {
-        toast.error("Invalid or expired OTP");
-      } else {
-        toast.error("Failed to verify email");
-      }
-
-      console.log("error in updateEmail", error);
-      return { success: false, error };
+      toast.error(
+        error.response?.status === 400
+          ? "Invalid or expired OTP"
+          : "Failed to verify email"
+      );
+      return { success: false };
     } finally {
       set({ isUpdatingEmail: false });
     }
   },
+
+  // 🗑️ delete account (auth required)
   requestDeleteAccount: async (password) => {
-  try {
-    await axiosInstance.post("/api/user/delete-account/request", { password });
-    toast.success("OTP sent to your email");
-    return { success: true };
-  } catch (error) {
-    const msg =
-      error?.response?.data?.message ||
-      error.message ||
-      "failed to request delete";
+    try {
+      get().requireAuth();
+      await axiosInstance.post("/api/user/delete-account/request", { password });
+      toast.success("OTP sent to your email");
+      return { success: true };
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Failed to request account deletion"
+      );
+      return { success: false };
+    }
+  },
 
-    toast.error(msg);
-    return { success: false, error };
-  }
-},
+  confirmDeleteAccount: async (otp) => {
+    try {
+      get().requireAuth();
+      await axiosInstance.post("/api/user/delete-account/confirm", { otp });
 
-confirmDeleteAccount: async (otp) => {
-  try {
-    await axiosInstance.post("/api/user/delete-account/confirm", { otp });
-
-    toast.success("Account deleted successfully");
-    set({ user: null });
-
-    return { success: true };
-  } catch (error) {
-    const msg =
-      error?.response?.data?.message ||
-      error.message ||
-      "failed to delete account";
-
-    toast.error(msg);
-    return { success: false, error };
-  }
-},
-
+      toast.success("Account deleted successfully");
+      authStore.getState().logOut(); // 🔥 hard logout
+      return { success: true };
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Failed to delete account"
+      );
+      return { success: false };
+    }
+  },
 
   resendEmailOtp: async () => {
     try {
+      get().requireAuth();
       await axiosInstance.post("/api/user/email/change/resend");
-      toast.success("otp resent to your email");
-    } catch (error) {
-      console.log(`error in resendEmailOtp ${error.message}`);
-      toast.error("please try later");
+      toast.success("OTP resent to your email");
+    } catch {
+      toast.error("Please try again later");
     }
   },
 }));
