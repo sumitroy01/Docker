@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: chat-frontend-config
 data:
-  BACKEND_URL: "http://chat-backend:5000"
+  BACKEND_URL: "http://localhost:30050"

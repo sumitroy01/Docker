@@ -12,18 +12,21 @@ const authStore = create((set, get) => ({
   isLogginOut: false,
   verficationPendingId: null,
 
-  checkAuth: async () => {
+  
+checkAuth: async () => {
   try {
-    const res = await axiosInstance.get("/api/auth/check");
-    const user = res.data;
-    set({ authUser: user });
-   
+    const res = await axiosInstance.get("/api/auth/me");
+    set({ authUser: res.data });
+    return res.data;
   } catch {
     set({ authUser: null });
+    return null;
   } finally {
     set({ isCheckingAuth: false });
   }
 },
+
+
 
 
   signUp: async (data) => {

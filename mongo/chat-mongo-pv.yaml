@@ -4,8 +4,9 @@ metadata:
   name: chat-mongo-pv
 spec:
   capacity:
-    storage: 5Gi
+    storage: 3Gi
   accessModes:
     - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
   hostPath:
-    path: /data/chat-mongo
+    path: /tmp/chat-mongo

@@ -1,10 +1,4 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chat-backend
-spec:
-  replicas: 1
-  selector:
+selector:
     matchLabels:
       app: chat-backend
   template:
@@ -24,11 +18,11 @@ spec:
                 name: chat-backend-secret
           readinessProbe:
             httpGet:
-              path: /health
+              path: /api/auth/health
               port: 5000
             initialDelaySeconds: 10
           livenessProbe:
             httpGet:
-              path: /health
+              path: /api/auth/health
               port: 5000
             initialDelaySeconds: 30

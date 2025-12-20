@@ -3,9 +3,10 @@ kind: Service
 metadata:
   name: chat-backend
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: chat-backend
   ports:
     - port: 5000
       targetPort: 5000
+      nodePort: 30050
