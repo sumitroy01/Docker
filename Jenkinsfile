@@ -59,8 +59,10 @@ pipeline {
                 sh '''
           echo "Applying backend & frontend manifests..."
 
-          kubectl apply -f k8s/backend
-          kubectl apply -f k8s/frontend
+          kubectl apply -f k8s/backend/deployment.yaml
+          kubectl apply -f k8s/backend/service.yaml
+          kubectl apply -f k8s/frontend/deployment.yaml
+          kubectl apply -f k8s/frontend/service.yaml
 
           echo "Restarting deployments to pull new images..."
 
