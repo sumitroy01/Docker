@@ -9,7 +9,6 @@ import {
   resetPassword,
   verifyUser,
   resendOtp,
-  healthCheck,
   
 } from "../controllers/auth-controllers.js";
 
@@ -28,8 +27,5 @@ router.post("/verify-user", verifyUser);
 // password reset 
 router.post("/password/request-reset", requestResetPassword); 
 router.post("/password/reset", resetPassword);               
-
-router.get("/health", healthCheck);
-router.get("/me", protectRoute, checkAuth);
 
 export default router;
