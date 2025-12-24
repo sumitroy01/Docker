@@ -114,7 +114,6 @@ function App() {
     return (
       <>
         <FullScreenLoader />
-        <Toaster position="top-right" />
       </>
     );
   }
