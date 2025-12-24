@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import authStore from "../store/auth.store.js";
-import toast from "react-hot-toast";
 
 import LoginForm from "../components/auth/LoginForm.jsx";
 import SignupForm from "../components/auth/SignupForm.jsx";
@@ -12,23 +11,17 @@ import VerifyAccountForm from "../components/auth/VerifyAccountForm.jsx";
 
 function AuthPage({ initialMode = "login", onBackToLanding }) {
   const {
-  signUp,
-  logIn,
-  forgotPass,
-  resetPass,
-  verifyUser,
-  resendOtp,
-
-  isSigningUp,
-  isLogginIn,
-  isResettingPass,
-  verficationPendingId,
-
-  error,
-  successMessage,
-  clearStatus,
-} = authStore();
-
+    signUp,
+    logIn,
+    forgotPass,
+    resetPass,
+    verifyUser,
+    resendOtp,
+    isSigningUp,
+    isLogginIn,
+    isResettingPass,
+    verficationPendingId,
+  } = authStore();
 
   // main mode state
   const [mode, setMode] = useState(
@@ -36,7 +29,11 @@ function AuthPage({ initialMode = "login", onBackToLanding }) {
   );
 
   // keep mode in sync with initialMode when NOT verifying
-  
+  useEffect(() => {
+    if (!verficationPendingId) {
+      setMode(initialMode);
+    }
+  }, [initialMode, verficationPendingId]);
 
   const [resetEmail, setResetEmail] = useState("");
 

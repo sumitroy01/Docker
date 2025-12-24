@@ -1,23 +1,17 @@
-// src/store/auth.store.js
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
+import toast from "react-hot-toast";
 
 const authStore = create((set, get) => ({
   authUser: null,
-
   isSigningUp: false,
   isLogginIn: false,
   isCheckingAuth: true,
   isResettingPass: false,
   isLogginOut: false,
-
   verficationPendingId: null,
 
-  error: null,
-  successMessage: null,
-
-  clearStatus: () => set({ error: null, successMessage: null }),
-
+  
   checkAuth: async () => {
     try {
       const res = await axiosInstance.get("/api/auth/check");
@@ -30,18 +24,14 @@ const authStore = create((set, get) => ({
   },
 
   signUp: async (data) => {
-    set({ isSigningUp: true, error: null });
+    set({ isSigningUp: true });
     try {
       const res = await axiosInstance.post("/api/auth/signup", data);
-      set({
-        verficationPendingId: res.data.userId,
-        successMessage: res.data.message,
-      });
+      set({ verficationPendingId: res.data.userId });
+      toast.success(res.data.message);
       return { success: true };
     } catch (error) {
-      set({
-        error: error?.response?.data?.message || "Signup failed",
-      });
+      toast.error(error?.response?.data?.message || "signup failed");
       return { success: false };
     } finally {
       set({ isSigningUp: false });
@@ -52,7 +42,7 @@ const authStore = create((set, get) => ({
     const { verficationPendingId, checkAuth } = get();
 
     if (!verficationPendingId) {
-      set({ error: "Invalid user. Please signup again." });
+      toast.error("invalid user. please signup again");
       return { success: false };
     }
 
@@ -62,44 +52,42 @@ const authStore = create((set, get) => ({
         otp,
       });
 
-      set({
-        verficationPendingId: null,
-        successMessage: "Account verified successfully",
-      });
+      set({ verficationPendingId: null });
 
+      // 🔑 TRUST BACKEND, NOT RESPONSE
       await checkAuth();
+
+      toast.success("account verified successfully");
       return { success: true };
     } catch (error) {
-      set({
-        error: error?.response?.data?.message || "Invalid OTP",
-      });
+      toast.error(error?.response?.data?.message || "invalid otp");
       return { success: false };
     }
   },
 
   logIn: async ({ identifier, password }) => {
-    set({ isLogginIn: true, error: null });
+    set({ isLogginIn: true });
     try {
       await axiosInstance.post("/api/auth/login", {
         identifier,
         password,
       });
 
+      // 🔑 DO NOT SET authUser HERE
       await get().checkAuth();
-      set({ successMessage: "Logged in successfully" });
+
+      toast.success("logged in successfully");
       return { success: true };
     } catch (error) {
       const data = error?.response?.data;
 
       if (data?.needsVerification && data?.userId) {
-        set({
-          verficationPendingId: data.userId,
-          error: data.message,
-        });
+        set({ verficationPendingId: data.userId });
+        toast.error(data.message);
         return { success: false, needsVerification: true };
       }
 
-      set({ error: data?.message || "Login failed" });
+      toast.error(data?.message || "login failed");
       return { success: false };
     } finally {
       set({ isLogginIn: false });
@@ -111,29 +99,11 @@ const authStore = create((set, get) => ({
     try {
       await axiosInstance.post("/api/auth/logout");
       set({ authUser: null });
-      return { success: true };
+      toast.success("logged out successfully");
+    } catch (error) {
+      toast.error("logout failed");
     } finally {
       set({ isLogginOut: false });
-    }
-  },
-
-  resendOtp: async () => {
-    const { verficationPendingId } = get();
-
-    if (!verficationPendingId) {
-      set({ error: "No verification pending" });
-      return;
-    }
-
-    try {
-      await axiosInstance.post("/api/auth/resend-otp", {
-        userId: verficationPendingId,
-      });
-      set({ successMessage: "OTP resent successfully" });
-    } catch (error) {
-      set({
-        error: error?.response?.data?.message || "Failed to resend OTP",
-      });
     }
   },
 }));
