@@ -106,6 +106,28 @@ const authStore = create((set, get) => ({
       set({ isLogginOut: false });
     }
   },
+  resendOtp: async () => {
+  const { verficationPendingId } = get();
+
+  if (!verficationPendingId) {
+    toast.error("No verification pending");
+    return;
+  }
+
+  try {
+    await axiosInstance.post("/api/auth/resend-otp", {
+      userId: verficationPendingId,
+    });
+
+    toast.success("OTP resent successfully");
+  } catch (error) {
+    toast.error(
+      error?.response?.data?.message || "Failed to resend OTP"
+    );
+  }
+},
+
+
 }));
 
 export default authStore;
