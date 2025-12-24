@@ -7,11 +7,26 @@ export const axiosInstance = axios.create({
   withCredentials: true,
 });
 
-// 🔥 ADD THIS
-axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+
+let isSessionExpiredToastShown = false;
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+
+    if (status === 401) {
+      if (!isSessionExpiredToastShown) {
+        isSessionExpiredToastShown = true;
+
+        import("react-hot-toast").then(({ default: toast }) => {
+          toast.error("Session expired. Please login again.");
+        });
+      }
+
+      
+    }
+
+    return Promise.reject(error);
   }
-  return config;
-});
+);

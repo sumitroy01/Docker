@@ -2,12 +2,23 @@
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
-import authStore from "./auth.store";
+
+/* ---------- helpers ---------- */
+
+const handleAuthError = (error) => {
+  if (error?.response?.status === 401) {
+    toast.error("Session expired. Please login again.");
+    return true;
+  }
+  return false;
+};
 
 const sortMessagesAsc = (msgs = []) =>
   [...msgs].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
+
+/* ---------- store ---------- */
 
 const messageStore = create((set, get) => ({
   messagesByChat: {},
@@ -18,32 +29,24 @@ const messageStore = create((set, get) => ({
   isDeletingMessage: false,
   isDeletingChat: false,
 
-  // 🔒 AUTH GUARD
-  requireAuth() {
-    const { authUser } = authStore.getState();
-    if (!authUser) throw new Error("Not authenticated");
-    return authUser;
-  },
+  /* ---------- fetch messages ---------- */
 
-  // 📥 FETCH MESSAGES
   fetchMessages: async ({ chatId, page = 1, limit = 50, sort = "asc" }) => {
+    if (!chatId) return { success: false };
+
+    set({ isFetchingMessages: true });
     try {
-      get().requireAuth();
-      if (!chatId) return { success: false };
-
-      set({ isFetchingMessages: true });
-
       const res = await axiosInstance.get(`/api/message/${chatId}`, {
         params: { page, limit, sort },
       });
 
-      const { data = [], page: resPage, limit: resLimit } = res.data || {};
-      const hasMore = data.length === resLimit;
+      const { data, page: resPage, limit: resLimit } = res.data || {};
+      const hasMore = Array.isArray(data) && data.length === resLimit;
 
       set((state) => {
         const existing = state.messagesByChat[chatId] || { data: [] };
         const merged =
-          resPage === 1 ? data : [...existing.data, ...data];
+          resPage === 1 ? data || [] : [...existing.data, ...(data || [])];
 
         return {
           messagesByChat: {
@@ -59,30 +62,45 @@ const messageStore = create((set, get) => ({
       });
 
       return { success: true };
-    } catch {
+    } catch (error) {
+      if (handleAuthError(error)) return { success: false };
+      toast.error(
+        error?.response?.data?.message || "could not fetch messages"
+      );
       return { success: false };
     } finally {
       set({ isFetchingMessages: false });
     }
   },
 
-  // ✉️ SEND MESSAGE
+  /* ---------- send message ---------- */
+
   sendMessage: async (payload) => {
+    const chatId =
+      payload instanceof FormData ? payload.get("chatId") : payload?.chatId;
+
+    if (!chatId) {
+      toast.error("chatId is required");
+      return { success: false };
+    }
+
+    set({ isSendingMessage: true });
     try {
-      get().requireAuth();
-      const chatId =
-        payload instanceof FormData ? payload.get("chatId") : payload?.chatId;
+      const config =
+        payload instanceof FormData
+          ? { headers: { "Content-Type": "multipart/form-data" } }
+          : undefined;
 
-      if (!chatId) return { success: false };
-
-      set({ isSendingMessage: true });
-
-      const res = await axiosInstance.post("/api/message", payload);
+      const res = await axiosInstance.post("/api/message", payload, config);
       const newMessage = res.data;
 
       set((state) => {
-        const existing =
-          state.messagesByChat[chatId] || { data: [], page: 1, limit: 50 };
+        const existing = state.messagesByChat[chatId] || {
+          data: [],
+          page: 1,
+          limit: 50,
+          hasMore: true,
+        };
 
         const exists = existing.data.some(
           (m) =>
@@ -90,10 +108,9 @@ const messageStore = create((set, get) => ({
             (m.clientId && newMessage.clientId && m.clientId === newMessage.clientId)
         );
 
-        const merged = exists
+        const updated = exists
           ? existing.data.map((m) =>
-              String(m._id) === String(newMessage._id) ||
-              (m.clientId && newMessage.clientId && m.clientId === newMessage.clientId)
+              String(m._id) === String(newMessage._id)
                 ? { ...m, ...newMessage }
                 : m
             )
@@ -102,99 +119,155 @@ const messageStore = create((set, get) => ({
         return {
           messagesByChat: {
             ...state.messagesByChat,
-            [chatId]: {
-              ...existing,
-              data: sortMessagesAsc(merged),
-            },
+            [chatId]: { ...existing, data: sortMessagesAsc(updated) },
           },
         };
       });
 
       return { success: true };
-    } catch {
-      toast.error("Login required to send message");
+    } catch (error) {
+      if (handleAuthError(error)) return { success: false };
+      toast.error(
+        error?.response?.data?.message || "could not send message"
+      );
       return { success: false };
     } finally {
       set({ isSendingMessage: false });
     }
   },
 
-  // 👁️ MARK AS READ
+  /* ---------- mark as read ---------- */
+
   markAsRead: async ({ chatId, messageId, userId, silent = false }) => {
+    if (!chatId && !messageId) return { success: false };
+
+    set({ isMarkingRead: true });
     try {
-      get().requireAuth();
-      if (!chatId && !messageId) return { success: false };
-
-      set({ isMarkingRead: true });
-
-      const body = {};
-      if (chatId) body.chatId = chatId;
-      if (messageId) body.messageId = messageId;
-
-      await axiosInstance.put("/api/message/read", body);
+      await axiosInstance.put("/api/message/read", {
+        chatId,
+        messageId,
+      });
 
       set((state) => {
         const updated = { ...state.messagesByChat };
 
-        Object.keys(updated).forEach((cId) => {
-          if (chatId && cId !== chatId) return;
-          updated[cId] = {
-            ...updated[cId],
-            data: updated[cId].data.map((m) =>
-              messageId && String(m._id) !== String(messageId)
-                ? m
-                : userId && !m.readBy?.includes(userId)
-                ? { ...m, readBy: [...(m.readBy || []), userId] }
-                : m
-            ),
-          };
+        Object.values(updated).forEach((entry) => {
+          if (!entry?.data) return;
+          entry.data = entry.data.map((msg) =>
+            String(msg._id) === String(messageId) && userId
+              ? { ...msg, readBy: [...(msg.readBy || []), userId] }
+              : msg
+          );
         });
 
         return { messagesByChat: updated };
       });
 
+      if (!silent) toast.success("marked as read");
       return { success: true };
-    } catch {
-      if (!silent) toast.error("Login required");
+    } catch (error) {
+      if (handleAuthError(error)) return { success: false };
+      if (!silent) toast.error("could not mark as read");
       return { success: false };
     } finally {
       set({ isMarkingRead: false });
     }
   },
 
-  // 🗑️ DELETE MESSAGE
+  /* ---------- delete message ---------- */
+
   deleteMessage: async ({ messageId, chatId }) => {
+    if (!messageId) return { success: false };
+
+    set({ isDeletingMessage: true });
     try {
-      get().requireAuth();
-      if (!messageId) return { success: false };
-
-      set({ isDeletingMessage: true });
-
       await axiosInstance.delete(`/api/message/${messageId}`);
 
       set((state) => {
         const updated = { ...state.messagesByChat };
-        if (chatId && updated[chatId]) {
-          updated[chatId] = {
-            ...updated[chatId],
-            data: updated[chatId].data.filter(
-              (m) => String(m._id) !== String(messageId)
-            ),
-          };
+        const entry = updated[chatId];
+        if (entry?.data) {
+          entry.data = entry.data.filter(
+            (m) => String(m._id) !== String(messageId)
+          );
         }
         return { messagesByChat: updated };
       });
 
+      toast.success("message deleted");
       return { success: true };
-    } catch {
-      toast.error("Login required");
+    } catch (error) {
+      if (handleAuthError(error)) return { success: false };
+      toast.error("could not delete message");
       return { success: false };
     } finally {
       set({ isDeletingMessage: false });
     }
   },
 
-  // 🧹 CLEANUP
+  /* ---------- delete chat ---------- */
+
+  deleteChat: async (chatId) => {
+    if (!chatId) return { success: false };
+
+    set({ isDeletingChat: true });
+    try {
+      await axiosInstance.delete(`/api/message/chat/${chatId}`);
+      set((state) => {
+        const updated = { ...state.messagesByChat };
+        delete updated[chatId];
+        return { messagesByChat: updated };
+      });
+
+      toast.success("chat deleted");
+      return { success: true };
+    } catch (error) {
+      if (handleAuthError(error)) return { success: false };
+      toast.error("could not delete chat");
+      return { success: false };
+    } finally {
+      set({ isDeletingChat: false });
+    }
+  },
+
+  /* ---------- socket helpers ---------- */
+
+  addIncomingMessage: (chatId, incomingMessage) => {
+    if (!chatId || !incomingMessage) return;
+
+    set((state) => {
+      const existing = state.messagesByChat[chatId] || {
+        data: [],
+        page: 1,
+        limit: 50,
+        hasMore: true,
+      };
+
+      const exists = existing.data.some(
+        (m) =>
+          String(m._id) === String(incomingMessage._id) ||
+          (m.clientId &&
+            incomingMessage.clientId &&
+            m.clientId === incomingMessage.clientId)
+      );
+
+      const updated = exists
+        ? existing.data.map((m) =>
+            String(m._id) === String(incomingMessage._id)
+              ? { ...m, ...incomingMessage }
+              : m
+          )
+        : [...existing.data, incomingMessage];
+
+      return {
+        messagesByChat: {
+          ...state.messagesByChat,
+          [chatId]: { ...existing, data: sortMessagesAsc(updated) },
+        },
+      };
+    });
+  },
+
   clearMessagesForChat: (chatId) => {
     if (!chatId) return;
     set((state) => {
