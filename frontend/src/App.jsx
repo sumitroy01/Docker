@@ -10,6 +10,7 @@ import LoggedOutHome from "./pages/LoggedOutHome";
 import ChatPage from "./pages/ChatPage";
 import AuthPage from "./pages/AuthPage.jsx";
 import ProfileSettings from "./pages/ProfileSettings.jsx";
+import GlobalToastListener from "./components/GlobalToastListener";
 
 import { initSocket, getSocket } from "./socket.js";
 import { registerSocketListeners } from "./lib/socket-listeners";
@@ -120,7 +121,9 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
       {/* ✅ ONE AND ONLY ONE TOASTER */}
-      <Toaster position="top-right" />
+        <Toaster position="top-right" />
+      <GlobalToastListener />
+
 
       <Navbar
         isLoggedIn={isLoggedIn}

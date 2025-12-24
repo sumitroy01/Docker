@@ -36,21 +36,7 @@ function AuthPage({ initialMode = "login", onBackToLanding }) {
   );
 
   // keep mode in sync with initialMode when NOT verifying
-  useEffect(() => {
-    if (!verficationPendingId) {
-      setMode(initialMode);
-    }
-  }, [initialMode, verficationPendingId]);
-  useEffect(() => {
-    if (error) {
-      toast.error(error);
-      clearStatus();
-    }
-    if (successMessage) {
-      toast.success(successMessage);
-      clearStatus();
-    }
-  }, [error, successMessage, clearStatus]);
+  
 
   const [resetEmail, setResetEmail] = useState("");
 
