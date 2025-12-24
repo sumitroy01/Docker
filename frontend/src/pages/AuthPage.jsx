@@ -12,17 +12,23 @@ import VerifyAccountForm from "../components/auth/VerifyAccountForm.jsx";
 
 function AuthPage({ initialMode = "login", onBackToLanding }) {
   const {
-    signUp,
-    logIn,
-    forgotPass,
-    resetPass,
-    verifyUser,
-    resendOtp,
-    isSigningUp,
-    isLogginIn,
-    isResettingPass,
-    verficationPendingId,
-  } = authStore();
+  signUp,
+  logIn,
+  forgotPass,
+  resetPass,
+  verifyUser,
+  resendOtp,
+
+  isSigningUp,
+  isLogginIn,
+  isResettingPass,
+  verficationPendingId,
+
+  error,
+  successMessage,
+  clearStatus,
+} = authStore();
+
 
   // main mode state
   const [mode, setMode] = useState(
