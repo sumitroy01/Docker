@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import authStore from "../store/auth.store.js";
+import toast from "react-hot-toast";
 
 import LoginForm from "../components/auth/LoginForm.jsx";
 import SignupForm from "../components/auth/SignupForm.jsx";
@@ -34,6 +35,16 @@ function AuthPage({ initialMode = "login", onBackToLanding }) {
       setMode(initialMode);
     }
   }, [initialMode, verficationPendingId]);
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearStatus();
+    }
+    if (successMessage) {
+      toast.success(successMessage);
+      clearStatus();
+    }
+  }, [error, successMessage, clearStatus]);
 
   const [resetEmail, setResetEmail] = useState("");
 

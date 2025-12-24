@@ -1,17 +1,23 @@
+// src/store/auth.store.js
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
-import toast from "react-hot-toast";
 
 const authStore = create((set, get) => ({
   authUser: null,
+
   isSigningUp: false,
   isLogginIn: false,
   isCheckingAuth: true,
   isResettingPass: false,
   isLogginOut: false,
+
   verficationPendingId: null,
 
-  
+  error: null,
+  successMessage: null,
+
+  clearStatus: () => set({ error: null, successMessage: null }),
+
   checkAuth: async () => {
     try {
       const res = await axiosInstance.get("/api/auth/check");
@@ -24,14 +30,18 @@ const authStore = create((set, get) => ({
   },
 
   signUp: async (data) => {
-    set({ isSigningUp: true });
+    set({ isSigningUp: true, error: null });
     try {
       const res = await axiosInstance.post("/api/auth/signup", data);
-      set({ verficationPendingId: res.data.userId });
-      toast.success(res.data.message);
+      set({
+        verficationPendingId: res.data.userId,
+        successMessage: res.data.message,
+      });
       return { success: true };
     } catch (error) {
-      toast.error(error?.response?.data?.message || "signup failed");
+      set({
+        error: error?.response?.data?.message || "Signup failed",
+      });
       return { success: false };
     } finally {
       set({ isSigningUp: false });
@@ -42,7 +52,7 @@ const authStore = create((set, get) => ({
     const { verficationPendingId, checkAuth } = get();
 
     if (!verficationPendingId) {
-      toast.error("invalid user. please signup again");
+      set({ error: "Invalid user. Please signup again." });
       return { success: false };
     }
 
@@ -52,84 +62,80 @@ const authStore = create((set, get) => ({
         otp,
       });
 
-      set({ verficationPendingId: null });
+      set({
+        verficationPendingId: null,
+        successMessage: "Account verified successfully",
+      });
 
-      // 🔑 TRUST BACKEND, NOT RESPONSE
       await checkAuth();
-
-      toast.success("account verified successfully");
       return { success: true };
     } catch (error) {
-      toast.error(error?.response?.data?.message || "invalid otp");
+      set({
+        error: error?.response?.data?.message || "Invalid OTP",
+      });
       return { success: false };
     }
   },
 
   logIn: async ({ identifier, password }) => {
-    set({ isLogginIn: true });
+    set({ isLogginIn: true, error: null });
     try {
       await axiosInstance.post("/api/auth/login", {
         identifier,
         password,
       });
 
-      // 🔑 DO NOT SET authUser HERE
       await get().checkAuth();
-
-      toast.success("logged in successfully");
+      set({ successMessage: "Logged in successfully" });
       return { success: true };
     } catch (error) {
       const data = error?.response?.data;
 
       if (data?.needsVerification && data?.userId) {
-        set({ verficationPendingId: data.userId });
-        toast.error(data.message);
+        set({
+          verficationPendingId: data.userId,
+          error: data.message,
+        });
         return { success: false, needsVerification: true };
       }
 
-      toast.error(data?.message || "login failed");
+      set({ error: data?.message || "Login failed" });
       return { success: false };
     } finally {
       set({ isLogginIn: false });
     }
   },
 
- logOut: async () => {
-  set({ isLogginOut: true });
-  try {
-    await axiosInstance.post("/api/auth/logout");
-    set({ authUser: null });
-    return { success: true };
-  } catch {
-    return { success: false };
-  } finally {
-    set({ isLogginOut: false });
-  }
-},
-
+  logOut: async () => {
+    set({ isLogginOut: true });
+    try {
+      await axiosInstance.post("/api/auth/logout");
+      set({ authUser: null });
+      return { success: true };
+    } finally {
+      set({ isLogginOut: false });
+    }
+  },
 
   resendOtp: async () => {
-  const { verficationPendingId } = get();
+    const { verficationPendingId } = get();
 
-  if (!verficationPendingId) {
-    toast.error("No verification pending");
-    return;
-  }
+    if (!verficationPendingId) {
+      set({ error: "No verification pending" });
+      return;
+    }
 
-  try {
-    await axiosInstance.post("/api/auth/resend-otp", {
-      userId: verficationPendingId,
-    });
-
-    toast.success("OTP resent successfully");
-  } catch (error) {
-    toast.error(
-      error?.response?.data?.message || "Failed to resend OTP"
-    );
-  }
-},
-
-
+    try {
+      await axiosInstance.post("/api/auth/resend-otp", {
+        userId: verficationPendingId,
+      });
+      set({ successMessage: "OTP resent successfully" });
+    } catch (error) {
+      set({
+        error: error?.response?.data?.message || "Failed to resend OTP",
+      });
+    }
+  },
 }));
 
 export default authStore;
