@@ -94,18 +94,20 @@ const authStore = create((set, get) => ({
     }
   },
 
-  logOut: async () => {
-    set({ isLogginOut: true });
-    try {
-      await axiosInstance.post("/api/auth/logout");
-      set({ authUser: null });
-      toast.success("logged out successfully");
-    } catch (error) {
-      toast.error("logout failed");
-    } finally {
-      set({ isLogginOut: false });
-    }
-  },
+ logOut: async () => {
+  set({ isLogginOut: true });
+  try {
+    await axiosInstance.post("/api/auth/logout");
+    set({ authUser: null });
+    return { success: true };
+  } catch {
+    return { success: false };
+  } finally {
+    set({ isLogginOut: false });
+  }
+},
+
+
   resendOtp: async () => {
   const { verficationPendingId } = get();
 
