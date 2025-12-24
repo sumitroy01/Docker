@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -9,7 +10,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
                 checkout scm
@@ -51,6 +51,25 @@ pipeline {
                   docker push $BACKEND_IMAGE
                   docker push $FRONTEND_IMAGE
                 '''
+            }
+        }
+
+        stage('Deploy to kind') {
+            steps {
+                sh '''
+          echo "Applying backend & frontend manifests..."
+
+          kubectl apply -f k8s/backend
+          kubectl apply -f k8s/frontend
+
+          echo "Restarting deployments to pull new images..."
+
+          kubectl rollout restart deployment/backend
+          kubectl rollout restart deployment/frontend
+
+          kubectl rollout status deployment/backend
+          kubectl rollout status deployment/frontend
+        '''
             }
         }
     }
