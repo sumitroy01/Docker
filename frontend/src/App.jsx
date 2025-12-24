@@ -111,11 +111,7 @@ function App() {
 
   /* ---- LOADING ---- */
   if (isCheckingAuth) {
-    return (
-      <>
-        <FullScreenLoader />
-      </>
-    );
+    return <FullScreenLoader />;
   }
 
   const isLoggedIn = !!authUser;
@@ -123,6 +119,9 @@ function App() {
   /* ---- RENDER ---- */
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+      {/* ✅ ONE AND ONLY ONE TOASTER */}
+      <Toaster position="top-right" />
+
       <Navbar
         isLoggedIn={isLoggedIn}
         onLogout={logOut}
@@ -178,8 +177,6 @@ function App() {
           )}
         </AnimatePresence>
       </main>
-
-      <Toaster position="top-right" />
     </div>
   );
 }
